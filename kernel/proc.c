@@ -41,7 +41,7 @@ procinit(void)
       kvmmap(va, (uint64)pa, PGSIZE, PTE_R | PTE_W);
       p->kstack = va;
   }
-  kvminithart();
+  kvminithart();           // 内核栈只有一个根页表
 }
 
 // Must be called with interrupts disabled,
@@ -126,7 +126,7 @@ found:
   memset(&p->context, 0, sizeof(p->context));
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
-
+  p->trace_mask = 0;
   return p;
 }
 
@@ -150,6 +150,7 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  p->trace_mask = 0;
 }
 
 // Create a user page table for a given process,
@@ -290,6 +291,8 @@ fork(void)
   np->cwd = idup(p->cwd);
 
   safestrcpy(np->name, p->name, sizeof(p->name));
+
+  np->trace_mask = p->trace_mask; // 自己添加用于trace跟踪
 
   pid = np->pid;
 
@@ -692,4 +695,17 @@ procdump(void)
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
   }
+}
+
+
+uint64
+proccount(void)
+{
+  struct proc *p;
+  uint64 count = 0;
+  for (p = proc; p < &proc[NPROC]; p++) {
+    if (p->state == UNUSED) continue;
+    count++;
+  }
+  return count;
 }
