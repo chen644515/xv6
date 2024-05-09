@@ -5,6 +5,8 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -132,7 +134,8 @@ kvmpa(uint64 va)
   pte_t *pte;
   uint64 pa;
   
-  pte = walk(kernel_pagetable, va, 0);
+  struct proc *p = myproc();
+  pte = walk(p->proc_kernel_pagetable, va, 0);
   if(pte == 0)
     panic("kvmpa");
   if((*pte & PTE_V) == 0)
@@ -440,3 +443,79 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
     return -1;
   }
 }
+
+// Recursive helper
+void vmprint_t(pagetable_t pagetable, int depth) {
+  static char* indent[] = {
+      "",
+      "..",
+      ".. ..",
+      ".. .. .."
+  };
+  if (depth <= 0 || depth >= 4) {
+    panic("vmprint_helper: depth not in {1, 2, 3}");
+  }
+  // there are 2^9 = 512 PTES in a page table.
+  for (int i = 0; i < 512; i++) {
+    pte_t pte = pagetable[i];
+    if (pte & PTE_V) { //是一个有效的PTE
+      printf("%s%d: pte %p pa %p\n", indent[depth], i, pte, PTE2PA(pte));
+      if ((pte & (PTE_R|PTE_W|PTE_X)) == 0) {
+        // points to a lower-level page table 并且是间接层PTE
+        uint64 child = PTE2PA(pte);
+        vmprint_t((pagetable_t)child, depth+1); // 递归, 深度+1
+      }
+    }
+  }
+}
+
+// Utility func to print the valid
+// PTEs within a page table recursively
+void vmprint(pagetable_t pagetable) {
+  printf("page table %p\n", pagetable);
+  vmprint_t(pagetable, 1);
+}
+
+
+
+void
+ukvmmap(pagetable_t kpagetable,uint64 va, uint64 pa, uint64 sz, int perm)
+{
+  if(mappages(kpagetable, va, sz, pa, perm) != 0)
+    panic("ukvmmap");
+}
+
+pagetable_t ukvminit()
+{
+  pagetable_t kpagetable = (pagetable_t)kalloc();
+  memset(kpagetable, 0, PGSIZE);
+
+  ukvmmap(kpagetable, UART0, UART0, PGSIZE, PTE_R | PTE_W);
+  ukvmmap(kpagetable, VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W);
+  ukvmmap(kpagetable, CLINT, CLINT, 0x10000, PTE_R | PTE_W);
+  ukvmmap(kpagetable, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
+  ukvmmap(kpagetable, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
+  ukvmmap(kpagetable, (uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W);
+  ukvmmap(kpagetable, TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X);
+
+  return kpagetable;
+}
+
+
+void 
+proc_freekernelpagetable(pagetable_t pagetable){
+  for (int i = 0; i < 512; ++i) {
+    pte_t pte = pagetable[i];
+    if ((pte & PTE_V)) {
+      pagetable[i] = 0;
+      if ((pte & (PTE_R | PTE_W | PTE_X)) == 0) {
+        uint64 child = PTE2PA(pte);
+        proc_freekernelpagetable((pagetable_t)child);
+      }
+    } else if (pte & PTE_V) {
+      panic("proc free kernelpagetable : leaf");
+    }
+  }
+  kfree((void*)pagetable);
+}
+
