@@ -77,8 +77,20 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2) {
+    if (p->alarm_t != 0 && p->inalarm == 0) {
+      if (p->alarm_t == p->tirck_count) {
+        // memmove(p->alarmframe, p->trapframe, sizeof(struct trapframe));
+        *p->alarmframe = *p->trapframe;
+        p->trapframe->epc = (uint64)p->alarm_handler;
+        p->tirck_count = 0;
+        p->inalarm = 1;
+      }
+      p->tirck_count++;
+  
+    }
     yield();
+  }
 
   usertrapret();
 }
@@ -124,7 +136,7 @@ usertrapret(void)
   // jump to trampoline.S at the top of memory, which 
   // switches to the user page table, restores user registers,
   // and switches to user mode with sret.
-  uint64 fn = TRAMPOLINE + (userret - trampoline);
+  uint64 fn = TRAMPOLINE + (userret - trampoline);        // userret
   ((void (*)(uint64,uint64))fn)(TRAPFRAME, satp);
 }
 

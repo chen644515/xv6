@@ -17,6 +17,7 @@ void test1();
 void test2();
 void periodic();
 void slow_handler();
+void print();
 
 int
 main(int argc, char *argv[])
@@ -37,6 +38,14 @@ periodic()
   sigreturn();
 }
 
+void
+print()
+{
+  count = count + 1;
+  printf("alarm!\n");
+  sigreturn();
+}
+
 // tests whether the kernel calls
 // the alarm handler even a single time.
 void
@@ -45,7 +54,17 @@ test0()
   int i;
   printf("test0 start\n");
   count = 0;
-  sigalarm(2, periodic);
+
+  void (*ptr)() = &print;
+    // 打印函数的地址
+  printf("Function address: %p\n", ptr);
+
+  // void (*pdr)() = &test1;
+    // 打印函数的地址
+  // printf("Function address: %p\n", pdr);
+
+
+  sigalarm(2, print);
   for(i = 0; i < 1000*500000; i++){
     if((i % 1000000) == 0)
       write(2, ".", 1);

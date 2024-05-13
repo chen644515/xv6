@@ -484,3 +484,32 @@ sys_pipe(void)
   }
   return 0;
 }
+
+uint64
+sys_sigalarm(void)
+{
+  struct proc *my_proc = myproc();
+  int period;
+  uint64 handler;
+  if (argint(0, &period) < 0)
+    return -1;
+  if(argaddr(1, &handler) < 0)
+    return -1;
+  my_proc->alarm_t = period;
+  my_proc->alarm_handler = (void*)handler;
+  my_proc->tirck_count = 0;
+  return 0;
+}
+
+uint64 
+sys_sigreturn(void)
+{
+  struct proc *p = myproc();
+  // memmove(p->trapframe, p->alarm_handler, sizeof(struct trapframe));
+
+  *p->trapframe = *p->alarmframe;
+  p->inalarm =  0;
+  // memmove(my_proc->trapframe, my_proc->alarmframe, sizeof(struct trapframe));
+  // my_proc->inalarm = 0;
+  return 0;
+}

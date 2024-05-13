@@ -132,3 +132,14 @@ printfinit(void)
   initlock(&pr.lock, "pr");
   pr.locking = 1;
 }
+
+void
+backtrace(void)
+{
+  uint64 fp = r_fp();                   // 获取当前函数的帧指针
+  while (PGROUNDUP(fp) - PGROUNDDOWN(fp) == PGSIZE) {
+    uint64 addr = *(uint64*)(fp - 8);
+    printf("%p\n", addr);
+    fp = *(uint64*)(fp - 16);
+  }
+}
