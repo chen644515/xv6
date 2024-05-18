@@ -6,6 +6,8 @@
 
 static int nthread = 1;
 static int round = 0;
+// pthread_mutex_lock lock;
+int a =  0;
 
 struct barrier {
   pthread_mutex_t barrier_mutex;
@@ -25,16 +27,29 @@ barrier_init(void)
 static void 
 barrier()
 {
+
   // YOUR CODE HERE
   //
   // Block until all threads have called barrier() and
   // then increment bstate.round.
   //
+  pthread_mutex_lock(&bstate.barrier_mutex);
+  bstate.nthread++;
+  if (bstate.nthread == nthread) {
+    bstate.round++;
+    bstate.nthread = 0;
+    pthread_cond_broadcast(&bstate.barrier_cond);
+
+  }
+  else {
+    pthread_cond_wait(&bstate.barrier_cond, &bstate.barrier_mutex);
+  }
+  pthread_mutex_unlock(&bstate.barrier_mutex);
   
 }
 
 static void *
-thread(void *xa)
+ thread(void *xa)
 {
   long n = (long) xa;
   long delay;
@@ -65,6 +80,7 @@ main(int argc, char *argv[])
   nthread = atoi(argv[1]);
   tha = malloc(sizeof(pthread_t) * nthread);
   srandom(0);
+  // pthread_mutex_init(&lock, NULL); 
 
   barrier_init();
 
