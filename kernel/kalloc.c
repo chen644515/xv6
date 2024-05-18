@@ -26,9 +26,10 @@ struct {
 void
 kinit()
 { 
-  printf("CPU'num: %d", NCPU);
+  char ke[15];
   for (int i = 0; i < NCPU; i++) {
-    initlock(&kmem[i].lock, "kmem");
+    snprintf(ke, sizeof(ke), "kmem_%d", i);
+    initlock(&kmem[i].lock, ke);
   }
   freerange(end, (void*)PHYSTOP);
 }
