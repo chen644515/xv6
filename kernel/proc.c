@@ -456,7 +456,7 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
-  struct proc *p;
+  struct proc *p;                                       
   struct cpu *c = mycpu();
   
   c->proc = 0;
@@ -466,7 +466,7 @@ scheduler(void)
     
     int nproc = 0;
     for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
+      acquire(&p->lock);                             // 给新线程上🔓
       if(p->state != UNUSED) {
         nproc++;
       }
@@ -476,11 +476,11 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
-        swtch(&c->context, &p->context);
+        swtch(&c->context, &p->context);            
 
         // Process is done running for now.
         // It should have changed its p->state before coming back.
-        c->proc = 0;
+        c->proc = 0;                                                     // 回到sched
       }
       release(&p->lock);
     }
@@ -514,19 +514,19 @@ sched(void)
     panic("sched interruptible");
 
   intena = mycpu()->intena;
-  swtch(&p->context, &mycpu()->context);
-  mycpu()->intena = intena;
+  swtch(&p->context, &mycpu()->context);                 // 核心调度器线程，函数会到度线程函数
+  mycpu()->intena = intena;                              // 
 }
 
 // Give up the CPU for one scheduling round.
 void
 yield(void)
 {
-  struct proc *p = myproc();
-  acquire(&p->lock);
-  p->state = RUNNABLE;
+  struct proc *p = myproc();                   // 获取当前内核线程
+  acquire(&p->lock);                           // 上转换前的🔓
+  p->state = RUNNABLE;                         // 将当前线程挂起就绪
   sched();
-  release(&p->lock);
+  release(&p->lock);                           // 给原先执行到这里的新线程解🔓
 }
 
 // A fork child's very first scheduling by scheduler()
