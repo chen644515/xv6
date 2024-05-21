@@ -401,6 +401,29 @@ bmap(struct inode *ip, uint bn)
     return addr;
   }
 
+  bn -= NINDIRECT;                  // 减去第一块的inode
+
+  if (bn < DBINDIRECT) {             // 是否位于二级inode范围内
+    if ((addr = ip->addrs[NDIRECT + 1]) == 0) {         // 到第一级级indoe块
+      ip->addrs[NDIRECT + 1] = addr = balloc(ip->dev);      // 没有就分配
+    }
+    bp = bread(ip->dev, addr);              
+    a = (uint*)bp->data;
+    if ((addr = a[bn / NINDIRECT]) == 0) {           // 到第二级inode
+      a[bn / NINDIRECT] = addr = balloc(ip->dev);
+      log_write(bp);                
+    }
+    brelse(bp);
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    if ((addr = a[bn % NINDIRECT]) == 0) {           // 到达具体的写入内容的块
+      a[bn % NINDIRECT] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+    return addr;
+  }
+
   panic("bmap: out of range");
 }
 
